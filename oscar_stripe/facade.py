@@ -1,10 +1,14 @@
+import logging
+
 from django.conf import settings
 from django.contrib.sites.models import Site
 from django.urls import reverse
 from django.http import JsonResponse
 import stripe
 
- 
+logger = logging.getLogger('stripe')
+
+
 def build_line_dict(line, base_url):
     return {
         'price_data': {
@@ -51,14 +55,18 @@ def create_checkout_session(basket, host=None):
     payment_method_types = getattr(settings, 'STRIPE_CALLBACK_HTTPS', ['card'])
     amount = int(basket.total_incl_tax * 100)
     try:
-        stripe.api_key = getattr(settings, 'STRIPE_API_KEY', 'sk_test_4eC39HqLyjWDarjtT1zdp7dc')
-        checkout_session = stripe.checkout.Session.create(
-            payment_method_types=payment_method_types,
-            line_items=build_line_items_array(basket, base_url),
-            mode='payment',
-            success_url=success_url,
-            cancel_url=cancel_url,
-        )
+        stripe.api_key = getattr(
+            settings, 'STRIPE_API_KEY', 'sk_test_4eC39HqLyjWDarjtT1zdp7dc')
+        param_dict = {
+            'payment_method_types': payment_method_types,
+            'line_items': build_line_items_array(basket, base_url),
+            'mode': 'payment',
+            'success_url': success_url,
+            'cancel_url': cancel_url
+        }
+        logger.debug("Creating stripe session using api key %s and params: %s" % (
+            stripe.api_key, param_dict))
+        checkout_session = stripe.checkout.Session.create(**param_dict)
         return JsonResponse({'id': checkout_session.id})
 
     except Exception as e:
